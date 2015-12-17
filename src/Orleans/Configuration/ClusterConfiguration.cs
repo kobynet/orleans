@@ -1,26 +1,3 @@
-﻿/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -30,6 +7,7 @@ using System.IO;
 using System.Xml;
 using System.Net.Sockets;
 using System.Net.NetworkInformation;
+using System.Threading.Tasks;
 
 
 namespace Orleans.Runtime.Configuration
@@ -144,12 +122,13 @@ namespace Orleans.Runtime.Configuration
 
         private static string WriteXml(XmlElement element)
         {
-            using(var text = new StringWriter())
+            using(var sw = new StringWriter())
             {
-                using(var xml = new XmlTextWriter(text))
+                using(var xw = XmlWriter.Create(sw))
                 { 
-                    element.WriteTo(xml);
-                    return text.ToString();
+                    element.WriteTo(xw);
+                    xw.Flush();
+                    return sw.ToString();
                 }
             }
         }
@@ -413,7 +392,7 @@ namespace Orleans.Runtime.Configuration
             return sb.ToString();
         }
 
-        internal static IPAddress ResolveIPAddress(string addrOrHost, byte[] subnet, AddressFamily family)
+        internal static async Task<IPAddress> ResolveIPAddress(string addrOrHost, byte[] subnet, AddressFamily family)
         {
             var loopback = (family == AddressFamily.InterNetwork) ? IPAddress.Loopback : IPAddress.IPv6Loopback;
 
@@ -440,7 +419,7 @@ namespace Orleans.Runtime.Configuration
                 }
 
                 var candidates = new List<IPAddress>();
-                IPAddress[] nodeIps = Dns.GetHostAddresses(addrOrHost);
+                IPAddress[] nodeIps = await Dns.GetHostAddressesAsync(addrOrHost);
                 foreach (var nodeIp in nodeIps)
                 {
                     if (nodeIp.AddressFamily != family || nodeIp.Equals(loopback)) continue;

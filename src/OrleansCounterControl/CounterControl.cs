@@ -1,26 +1,3 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -57,7 +34,7 @@ namespace Orleans.Counter.Control
         {
             using (var usageStr = new StringWriter())
             {
-                usageStr.WriteLine(Assembly.GetExecutingAssembly().GetName().Name + ".exe {command}");
+                usageStr.WriteLine(typeof(CounterControl).GetTypeInfo().Assembly.GetName().Name + ".exe {command}");
                 usageStr.WriteLine("Where commands are:");
                 usageStr.WriteLine(" /? or /help       = Display usage info");
                 usageStr.WriteLine(" /r or /register   = Register Windows performance counters for Orleans [default]");
@@ -146,7 +123,7 @@ namespace Orleans.Counter.Control
             }
             catch (Exception exc) 
             {
-                ConsoleText.WriteError("Error running " + Assembly.GetExecutingAssembly().GetName().Name + ".exe", exc);
+                ConsoleText.WriteError("Error running " + typeof(CounterControl).GetTypeInfo().Assembly.GetName().Name + ".exe", exc);
 
                 if (!BruteForce) return 2;
 
@@ -163,8 +140,10 @@ namespace Orleans.Counter.Control
             Trace.Listeners.Clear();
             var cfg = new NodeConfiguration {TraceFilePattern = null, TraceToConsole = false};
             TraceLogger.Initialize(cfg);
-            var logWriter = new LogWriterToConsole(true, true); // Use compact console output & no timestamps / log message metadata
-            TraceLogger.LogConsumers.Add(logWriter);
+
+            //TODO: Move it to use the APM APIs
+            //var logWriter = new LogWriterToConsole(true, true); // Use compact console output & no timestamps / log message metadata
+            //TraceLogger.LogConsumers.Add(logWriter);
         }
 
         /// <summary>

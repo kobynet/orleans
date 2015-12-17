@@ -1,27 +1,4 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
-﻿// ReSharper disable InconsistentNaming
+// ReSharper disable InconsistentNaming
 namespace Orleans
 {
     /// <summary>
@@ -406,6 +383,9 @@ namespace Orleans
         SiloShutdownEventCreated        = SiloBase + 42,
         SiloShutdownEventOpened         = SiloBase + 43,
         SiloShutdownEventReceived       = SiloBase + 44,
+        SiloLoadedDI                    = SiloBase + 45,
+        SiloFailedToLoadDI              = SiloBase + 46,
+        SiloFileNotFoundLoadingDI       = SiloBase + 47,
 
         CatalogBase                     = Runtime + 500,
         CatalogNonExistingActivation1   = CatalogBase + 1,
@@ -704,6 +684,7 @@ namespace Orleans
         Messaging_Dispatcher_TryForward         = MessagingBase + 31,
         Messaging_Dispatcher_TryForwardFailed   = MessagingBase + 32,
         Messaging_Dispatcher_ForwardingRequests = MessagingBase + 33,
+        Messaging_SimulatedMessageLoss          = MessagingBase + 34,
 
         DirectoryBase                           = Runtime + 1100,
         DirectoryBothPrimaryAndBackupForGrain   = DirectoryBase + 1,
@@ -730,7 +711,7 @@ namespace Orleans
         SchedulerWorkGroupShuttingDown          = SchedulerBase + 16,
         SchedulerNotEnqueuWorkWhenShutdown      = SchedulerBase + 17,
         SchedulerNotExecuteWhenShutdown         = SchedulerBase + 18,
-        SchedulerAppTurnsStopped                = SchedulerBase + 19,
+        SchedulerAppTurnsStopped_1              = SchedulerBase + 19,
         SchedulerWorkGroupStopping              = SchedulerBase + 20,
         SchedulerSkipWorkStopping               = SchedulerBase + 21,
         SchedulerSkipWorkCancelled              = SchedulerBase + 22,
@@ -743,6 +724,7 @@ namespace Orleans
         SchedulerTaskWaitIncomplete             = SchedulerBase + 29,
         SchedulerWorkerThreadExc                = SchedulerBase + 30,
         SchedulerQueueWorkItemWrongContext      = SchedulerBase + 31,
+        SchedulerAppTurnsStopped_2              = SchedulerBase + 32,
 
         GatewayBase                             = Runtime + 1300,
         GatewayClientOpenedSocket               = GatewayBase + 1,
@@ -873,6 +855,8 @@ namespace Orleans
         Loader_TypeLoadError_3                  = LoaderBase + 19,
         Loader_TypeLoadError_4                  = LoaderBase + 20,
         Loader_LoadAndCreateInstance_Failure    = LoaderBase + 21,
+        Loader_TryLoadAndCreateInstance_Failure = LoaderBase + 22,
+        Loader_TypeLoadError_5                  = LoaderBase + 23,
 
         PlacementBase                               = Runtime + 1800,
         Placement_RuntimeStatisticsUpdateFailure_1  = PlacementBase + 1,
@@ -897,6 +881,7 @@ namespace Orleans
         SerMgr_IgnoreAssembly                   = SerializationManagerBase + 8,
         SerMgr_TypeRegistrationFailureIgnore    = SerializationManagerBase + 9,
         SerMgr_ArtifactReport                   = SerializationManagerBase + 10,
+        SerMgr_UnavailableSerializer            = SerializationManagerBase + 11,
 
         WatchdogBase                            = Runtime + 2600,
         Watchdog_ParticipantThrownException     = WatchdogBase + 1,
@@ -1056,11 +1041,19 @@ namespace Orleans
         PersistentStreamPullingManager_AlreadyStarted   = PersistentStreamPullingManagerBase + 21,
         PersistentStreamPullingManager_AlreadyStopped   = PersistentStreamPullingManagerBase + 22,
         PersistentStreamPullingManager_PeriodicPrint    = PersistentStreamPullingManagerBase + 23,
-
-
-        AzureServiceRuntimeWrapper = Runtime + 3700,
+        
+        AzureServiceRuntimeWrapper          = Runtime + 3700,
         AzureServiceRuntime_NotLoaded       = AzureServiceRuntimeWrapper +1,
-        AzureServiceRuntime_FailedToLoad    = AzureServiceRuntimeWrapper +2,
+        AzureServiceRuntime_FailedToLoad    = AzureServiceRuntimeWrapper + 2,
+
+        CodeGenBase                         = Runtime + 3800,
+        CodeGenCompilationFailed            = CodeGenBase + 1,
+        CodeGenCompilationSucceeded         = CodeGenBase + 2,
+        CodeGenSourceGenerated              = CodeGenBase + 3,
+        CodeGenSerializerGenerator          = CodeGenBase + 4,
+        CodeGenIgnoringTypes                = CodeGenBase + 5,
+        CodeGenDllMissing                   = CodeGenBase + 6,
+        CodeGenSystemTypeRequiresSerializer = CodeGenBase + 7,
     }
 }
 // ReSharper restore InconsistentNaming

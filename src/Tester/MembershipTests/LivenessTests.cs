@@ -10,7 +10,7 @@ using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
-using Orleans.Runtime.Storage.Relational;
+using Orleans.SqlUtils;
 using UnitTests.General;
 
 namespace UnitTests.MembershipTests
@@ -318,6 +318,8 @@ namespace UnitTests.MembershipTests
         [ClassInitialize]
         public static void MyClassInitialize(TestContext testContext)
         {
+            CheckForAzureStorage();
+
             DoClassInitialize();
         }
 
@@ -418,11 +420,9 @@ namespace UnitTests.MembershipTests
         }
     }
 
-    [TestClass]
-    [DeploymentItem("CreateOrleansTables_SqlServer.sql")]
+    [TestClass]    
     public class LivenessTests_SqlServer : LivenessTestsBase
     {
-        private static IRelationalStorage relationalStorage;
         private const string testDatabaseName = "OrleansTest";
 
         private static readonly TestingSiloOptions siloOptions = new TestingSiloOptions
@@ -447,9 +447,9 @@ namespace UnitTests.MembershipTests
             Console.WriteLine(DumpTestContext(context));
 
             Console.WriteLine("Initializing relational databases...");
-            relationalStorage = SqlTestsEnvironment.Setup(testDatabaseName);
-                        
-            siloOptions.DataConnectionString = relationalStorage.ConnectionString;
+            var relationalStorage = RelationalStorageForTesting.SetupInstance(AdoNetInvariants.InvariantNameSqlServer, testDatabaseName).Result;
+
+            siloOptions.DataConnectionString = relationalStorage.CurrentConnectionString;
         }
 
         [TestCleanup]

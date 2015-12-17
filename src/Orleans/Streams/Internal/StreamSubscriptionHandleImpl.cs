@@ -1,26 +1,3 @@
-﻿/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Threading.Tasks;
 using Orleans.Runtime;
@@ -37,7 +14,7 @@ namespace Orleans.Streams
         [NonSerialized]
         private IAsyncObserver<T> observer;
         [NonSerialized]
-        private StreamSequenceToken expectedToken;
+        private StreamHandshakeToken expectedToken;
 
         internal bool IsValid { get { return streamImpl != null; } }
         internal GuidId SubscriptionId { get { return subscriptionId; } }
@@ -45,6 +22,9 @@ namespace Orleans.Streams
 
         public override IStreamIdentity StreamIdentity { get { return streamImpl; } }
         public override Guid HandleId { get { return subscriptionId.Guid; } }
+
+        // constructor used by serializator
+        private StreamSubscriptionHandleImpl() { }
 
         public StreamSubscriptionHandleImpl(GuidId subscriptionId, StreamImpl<T> streamImpl)
             : this(subscriptionId, null, streamImpl, null, null)
@@ -60,7 +40,7 @@ namespace Orleans.Streams
             this.observer = observer;
             this.streamImpl = streamImpl;
             this.filterWrapper = filterWrapper;
-            expectedToken = token;
+            expectedToken = StreamHandshakeToken.CreateStartToken(token);
         }
 
         public void Invalidate()
@@ -69,7 +49,7 @@ namespace Orleans.Streams
             observer = null;
         }
 
-        public StreamSequenceToken GetSequenceToken()
+        public StreamHandshakeToken GetSequenceToken()
         {
             return expectedToken;
         }
@@ -86,7 +66,7 @@ namespace Orleans.Streams
             return streamImpl.ResumeAsync(this, obs, token);
         }
 
-        public async Task<StreamSequenceToken> DeliverBatch(IBatchContainer batch, StreamSequenceToken handshakeToken)
+        public async Task<StreamHandshakeToken> DeliverBatch(IBatchContainer batch, StreamHandshakeToken handshakeToken)
         {
             if (expectedToken != null)
             {
@@ -99,19 +79,12 @@ namespace Orleans.Streams
                 await NextItem(itemTuple.Item1, itemTuple.Item2);
             }
 
-            // check again, in case the expectedToken was changed indiretly via ResumeAsync()
-            if (expectedToken != null)
-            {
-                if (!expectedToken.Equals(handshakeToken))
-                    return expectedToken;
-            }
-
-            expectedToken = batch.SequenceToken;
+            expectedToken = StreamHandshakeToken.CreateDeliveyToken(batch.SequenceToken);
 
             return null;
         }
 
-        public async Task<StreamSequenceToken> DeliverItem(object item, StreamSequenceToken currentToken, StreamSequenceToken handshakeToken)
+        public async Task<StreamHandshakeToken> DeliverItem(object item, StreamSequenceToken currentToken, StreamHandshakeToken handshakeToken)
         {
             if (expectedToken != null)
             {
@@ -128,7 +101,7 @@ namespace Orleans.Streams
                     return expectedToken;
             }
 
-            expectedToken = currentToken;
+            expectedToken = StreamHandshakeToken.CreateDeliveyToken(currentToken);
 
             return null;
         }

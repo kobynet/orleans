@@ -1,27 +1,4 @@
-﻿/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
- //#define REREAD_STATE_AFTER_WRITE_FAILED
+//#define REREAD_STATE_AFTER_WRITE_FAILED
 
 using System;
 using System.Collections.Generic;
@@ -65,6 +42,8 @@ namespace Orleans
 
         protected IGrainFactory GrainFactory { get; private set; }
 
+        protected IServiceProvider ServiceProvider { get; private set; }
+
         internal IGrainIdentity Identity;
 
         /// <summary>
@@ -87,6 +66,7 @@ namespace Orleans
             Identity = identity;
             Runtime = runtime;
             GrainFactory = runtime.GrainFactory;
+            ServiceProvider = runtime.ServiceProvider;
         }
 
         
@@ -136,7 +116,7 @@ namespace Orleans
         /// <returns>Handle for this Timer.</returns>
         /// <seealso cref="IDisposable"/>
         [SuppressMessage("Microsoft.Performance", "CA1822:MarkMembersAsStatic")]
-        protected IDisposable RegisterTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period)
+        protected virtual IDisposable RegisterTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period)
         {
             return Runtime.TimerRegistry.RegisterTimer(this, asyncCallback, state, dueTime, period);
         }
@@ -152,7 +132,7 @@ namespace Orleans
         /// <param name="dueTime">Due time for this reminder</param>
         /// <param name="period">Frequence period for this reminder</param>
         /// <returns>Promise for Reminder handle.</returns>
-        protected Task<IGrainReminder> RegisterOrUpdateReminder(string reminderName, TimeSpan dueTime, TimeSpan period)
+        protected virtual Task<IGrainReminder> RegisterOrUpdateReminder(string reminderName, TimeSpan dueTime, TimeSpan period)
         {
             if (!(this is IRemindable))
             {
@@ -167,7 +147,7 @@ namespace Orleans
         /// <param name="reminder">Reminder to unregister.</param>
         /// <returns>Completion promise for this operation.</returns>
         [SuppressMessage("Microsoft.Performance", "CA1822:MarkMembersAsStatic")]
-        protected Task UnregisterReminder(IGrainReminder reminder)
+        protected virtual Task UnregisterReminder(IGrainReminder reminder)
         {
             return Runtime.ReminderRegistry.UnregisterReminder(reminder);
         }
@@ -178,7 +158,7 @@ namespace Orleans
         /// <param name="reminderName">Reminder to return</param>
         /// <returns>Promise for Reminder handle.</returns>
         [SuppressMessage("Microsoft.Performance", "CA1822:MarkMembersAsStatic")]
-        protected Task<IGrainReminder> GetReminder(string reminderName)
+        protected virtual Task<IGrainReminder> GetReminder(string reminderName)
         {
             return Runtime.ReminderRegistry.GetReminder(reminderName);
         }
@@ -188,19 +168,19 @@ namespace Orleans
         /// </summary>
         /// <returns>Promise for list of Reminders registered for this grain.</returns>
         [SuppressMessage("Microsoft.Performance", "CA1822:MarkMembersAsStatic")]
-        protected Task<List<IGrainReminder>> GetReminders()
+        protected virtual Task<List<IGrainReminder>> GetReminders()
         {
             return Runtime.ReminderRegistry.GetReminders();
         }
 
         [SuppressMessage("Microsoft.Performance", "CA1822:MarkMembersAsStatic")]
-        protected IEnumerable<IStreamProvider> GetStreamProviders()
+        protected virtual IEnumerable<IStreamProvider> GetStreamProviders()
         {
             return Runtime.StreamProviderManager.GetStreamProviders();
         }
 
         [SuppressMessage("Microsoft.Performance", "CA1822:MarkMembersAsStatic")]
-        protected IStreamProvider GetStreamProvider(string name)
+        protected virtual IStreamProvider GetStreamProvider(string name)
         {
             if (string.IsNullOrWhiteSpace(name))
                 throw new ArgumentNullException("name");
@@ -212,7 +192,7 @@ namespace Orleans
         /// This call will mark this activation of the current grain to be deactivated and removed at the end of the current method.
         /// The next call to this grain will result in a different activation to be used, which typical means a new activation will be created automatically by the runtime.
         /// </summary>
-        protected void DeactivateOnIdle()
+        protected virtual void DeactivateOnIdle()
         {
             Runtime.DeactivateOnIdle(this);
         }
@@ -224,7 +204,7 @@ namespace Orleans
         /// DeactivateOnIdle method would undo / override any current “keep alive” setting, 
         /// making this grain immediately available for deactivation.
         /// </summary>
-        protected void DelayDeactivation(TimeSpan timeSpan)
+        protected virtual void DelayDeactivation(TimeSpan timeSpan)
         {
             Runtime.DelayDeactivation(this, timeSpan);
         }
@@ -252,7 +232,7 @@ namespace Orleans
         /// </summary>
         /// <returns>Name of the logger to use.</returns>
         [SuppressMessage("Microsoft.Performance", "CA1822:MarkMembersAsStatic")]
-        protected Logger GetLogger(string loggerName)
+        protected virtual Logger GetLogger(string loggerName)
         {
             return Runtime.GetLogger(loggerName, TraceLogger.LoggerType.Grain);
         }
@@ -313,17 +293,17 @@ namespace Orleans
             get { return base.GrainState as TGrainState; }
         }
 
-        protected Task ClearStateAsync()
+        protected virtual Task ClearStateAsync()
         {
             return Storage.ClearStateAsync();
         }
 
-        protected Task WriteStateAsync()
+        protected virtual Task WriteStateAsync()
         {
             return Storage.WriteStateAsync();
         }
 
-        protected Task ReadStateAsync()
+        protected virtual Task ReadStateAsync()
         {
             return Storage.ReadStateAsync();
         }

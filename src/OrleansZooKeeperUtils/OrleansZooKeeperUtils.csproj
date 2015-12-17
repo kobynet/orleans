@@ -9,10 +9,9 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>Orleans.Runtime.Host</RootNamespace>
     <AssemblyName>OrleansZooKeeperUtils</AssemblyName>
-    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.5.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\</SolutionDir>
-    <RestorePackages>true</RestorePackages>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -32,12 +31,6 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
-  <PropertyGroup>
-    <SignAssembly>true</SignAssembly>
-  </PropertyGroup>
-  <PropertyGroup>
-    <AssemblyOriginatorKeyFile>..\Orleans.snk</AssemblyOriginatorKeyFile>
-  </PropertyGroup>
   <ItemGroup>
     <Compile Include="..\Build\GlobalAssemblyInfo.cs">
       <Link>Properties\GlobalAssemblyInfo.cs</Link>
@@ -47,20 +40,16 @@
     <Compile Include="ZooKeeperBasedMembershipTable.cs" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\Orleans.snk">
-      <Link>Orleans.snk</Link>
-    </None>
-    <None Include="packages.config" />
-  </ItemGroup>
-  <ItemGroup>
     <Reference Include="Microsoft.CSharp" />
-    <Reference Include="Newtonsoft.Json, Version=4.5.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
-      <HintPath>..\packages\Newtonsoft.Json.5.0.8\lib\net45\Newtonsoft.Json.dll</HintPath>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>$(SolutionDir)packages\Newtonsoft.Json.6.0.8\lib\net45\Newtonsoft.Json.dll</HintPath>
+      <Private>True</Private>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Xml" />
-    <Reference Include="ZooKeeperNetEx, Version=3.4.6.1006, Culture=neutral, PublicKeyToken=42cd15de36f9b993, processorArchitecture=MSIL">
-      <HintPath>..\packages\ZooKeeperNetEx.3.4.6.1006\lib\net45\ZooKeeperNetEx.dll</HintPath>
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="ZooKeeperNetEx">
+      <HintPath>$(SolutionDir)packages\ZooKeeperNetEx.3.4.6.1008\lib\net45\ZooKeeperNetEx.dll</HintPath>
       <Private>True</Private>
     </Reference>
   </ItemGroup>
@@ -69,6 +58,9 @@
       <Project>{BC1BD60C-E7D8-4452-A21C-290AEC8E2E74}</Project>
       <Name>Orleans</Name>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>

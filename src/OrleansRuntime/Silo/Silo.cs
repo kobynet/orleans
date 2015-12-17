@@ -1,29 +1,8 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Runtime;
@@ -31,6 +10,7 @@ using System.Runtime.Serialization;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Orleans.CodeGeneration;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ConsistentRing;
@@ -48,9 +28,9 @@ using Orleans.Storage;
 using Orleans.Streams;
 using Orleans.Timers;
 
-
 namespace Orleans.Runtime
 {
+
     /// <summary>
     /// Orleans silo.
     /// </summary>
@@ -87,6 +67,7 @@ namespace Orleans.Runtime
         private readonly MembershipFactory membershipFactory;
         private StorageProviderManager storageProviderManager;
         private StatisticsProviderManager statisticsProviderManager;
+        private BootstrapProviderManager bootstrapProviderManager;
         private readonly LocalReminderServiceFactory reminderFactory;
         private IReminderService reminderService;
         private ProviderManagerSystemTarget providerManagerSystemTarget;
@@ -182,7 +163,9 @@ namespace Orleans.Runtime
 
             ActivationData.Init(config, nodeConfig);
             StatisticsCollector.Initialize(nodeConfig);
-            SerializationManager.Initialize(globalConfig.UseStandardSerializer);
+            
+            CodeGeneratorManager.GenerateAndCacheCodeForAllAssemblies();
+            SerializationManager.Initialize(globalConfig.UseStandardSerializer, globalConfig.SerializationProviders, globalConfig.UseJsonFallbackSerializer);
             initTimeout = globalConfig.MaxJoinAttemptTime;
             if (Debugger.IsAttached)
             {
@@ -215,7 +198,24 @@ namespace Orleans.Runtime
                 LocalDataStoreInstance.LocalDataStore = keyStore;
             }
 
-            services = ConfigureStartupBuilder.ConfigureStartup(nodeConfig.StartupTypeName);
+            services = new DefaultServiceProvider();
+            var startupBuilder = AssemblyLoader.TryLoadAndCreateInstance<IStartupBuilder>("OrleansDependencyInjection", logger);
+            if (startupBuilder != null)
+            {
+                logger.Info(ErrorCode.SiloLoadedDI, "Successfully loaded {0} from OrleansDependencyInjection.dll", startupBuilder.GetType().FullName);
+                try
+                {
+                    services = startupBuilder.ConfigureStartup(nodeConfig.StartupTypeName);
+                }
+                catch (FileNotFoundException exc)
+                {
+                    logger.Warn(ErrorCode.SiloFileNotFoundLoadingDI, "Caught a FileNotFoundException calling ConfigureStartup(). Ignoring it. {0}", exc);
+                }
+            }
+            else
+            {
+                logger.Warn(ErrorCode.SiloFailedToLoadDI, "Failed to load an implementation of IStartupBuilder from OrleansDependencyInjection.dll");
+            }
 
             healthCheckParticipants = new List<IHealthCheckParticipant>();
             allSiloProviders = new List<IProvider>();
@@ -254,7 +254,8 @@ namespace Orleans.Runtime
                 grainFactory,
                 new TimerRegistry(),
                 new ReminderRegistry(),
-                new StreamProviderManager());
+                new StreamProviderManager(),
+                Services);
 
 
             // Now the router/directory service
@@ -422,7 +423,7 @@ namespace Orleans.Runtime
             // Set up an execution context for this thread so that the target creation steps can use asynch values.
             RuntimeContext.InitializeMainThread();
 
-            SiloProviderRuntime.Initialize(GlobalConfig, SiloIdentity, grainFactory);
+            SiloProviderRuntime.Initialize(GlobalConfig, SiloIdentity, grainFactory, Services);
             InsideRuntimeClient.Current.CurrentStreamProviderRuntime = SiloProviderRuntime.Instance;
             statisticsProviderManager = new StatisticsProviderManager("Statistics", SiloProviderRuntime.Instance);
             string statsProviderName =  statisticsProviderManager.LoadProvider(GlobalConfig.ProviderConfigurations)
@@ -452,7 +453,7 @@ namespace Orleans.Runtime
             if (logger.IsVerbose) {  logger.Verbose("System grains created successfully."); }
 
             // Initialize storage providers once we have a basic silo runtime environment operating
-            storageProviderManager = new StorageProviderManager(grainFactory);
+            storageProviderManager = new StorageProviderManager(grainFactory, Services);
             scheduler.QueueTask(
                 () => storageProviderManager.LoadStorageProviders(GlobalConfig.ProviderConfigurations),
                 providerManagerSystemTarget.SchedulingContext)
@@ -515,12 +516,7 @@ namespace Orleans.Runtime
                     }
                 }
 
-                // Start stream providers after silo is active (so the pulling agents don't start sending messages before silo is active).
-                scheduler.QueueTask(siloStreamProviderManager.StartStreamProviders, providerManagerSystemTarget.SchedulingContext)
-                    .WaitWithThrow(initTimeout);
-                if (logger.IsVerbose) { logger.Verbose("Stream providers started successfully."); }
-
-                var bootstrapProviderManager = new BootstrapProviderManager();
+                bootstrapProviderManager = new BootstrapProviderManager();
                 scheduler.QueueTask(
                     () => bootstrapProviderManager.LoadAppBootstrapProviders(GlobalConfig.ProviderConfigurations),
                     providerManagerSystemTarget.SchedulingContext)
@@ -529,6 +525,12 @@ namespace Orleans.Runtime
                 allSiloProviders.AddRange(BootstrapProviders);
 
                 if (logger.IsVerbose) { logger.Verbose("App bootstrap calls done successfully."); }
+
+                // Start stream providers after silo is active (so the pulling agents don't start sending messages before silo is active).
+                // also after bootstrap provider started so bootstrap provider can initialize everything stream before events from this silo arrive.
+                scheduler.QueueTask(siloStreamProviderManager.StartStreamProviders, providerManagerSystemTarget.SchedulingContext)
+                    .WaitWithThrow(initTimeout);
+                if (logger.IsVerbose) { logger.Verbose("Stream providers started successfully."); }
 
                 // Now that we're active, we can start the gateway
                 var mc = messageCenter as MessageCenter;
@@ -708,16 +710,35 @@ namespace Orleans.Runtime
                 // 7:
                 SafeExecute(() => LocalGrainDirectory.StopPreparationCompletion.WaitWithThrow(stopTimeout));
 
+                // The order of closing providers might be importan: Stats, streams, boostrap, storage.
+                // Stats first since no one depends on it.
+                // Storage should definitely be last since other providers ma ybe using it, potentilay indirectly.
+                // Streams and Bootstrap - the order is less clear. Seems like Bootstrap may indirecly depend on Streams, but not the other way around.
                 // 8:
+                SafeExecute(() =>
+                {
+                    scheduler.QueueTask(() => statisticsProviderManager.CloseProviders(), providerManagerSystemTarget.SchedulingContext)
+                            .WaitWithThrow(initTimeout);
+                });
+                // 9:
                 SafeExecute(() =>
                 {                
                     var siloStreamProviderManager = (StreamProviderManager)grainRuntime.StreamProviderManager;
-                    scheduler.QueueTask(() => siloStreamProviderManager.StopStreamProviders(), providerManagerSystemTarget.SchedulingContext)
+                    scheduler.QueueTask(() => siloStreamProviderManager.CloseProviders(), providerManagerSystemTarget.SchedulingContext)
                             .WaitWithThrow(initTimeout);
                 });
-
-                // 9:
-                SafeExecute(storageProviderManager.UnloadStorageProviders);
+                // 10:
+                SafeExecute(() =>
+                {
+                    scheduler.QueueTask(() => bootstrapProviderManager.CloseProviders(), providerManagerSystemTarget.SchedulingContext)
+                            .WaitWithThrow(initTimeout);
+                });
+                // 11:
+                SafeExecute(() =>
+                {
+                    scheduler.QueueTask(() => storageProviderManager.CloseProviders(), providerManagerSystemTarget.SchedulingContext)
+                            .WaitWithThrow(initTimeout);
+                });
             }
             finally
             {
@@ -803,7 +824,7 @@ namespace Orleans.Runtime
         {
             private readonly Silo silo;
             internal bool ExecuteFastKillInProcessExit;
-
+            
             internal IConsistentRingProvider ConsistentRingProvider
             {
                 get { return CheckReturnBoundaryReference("ring provider", silo.RingProvider); }
@@ -821,8 +842,21 @@ namespace Orleans.Runtime
                 }
             }
 
+            /// <summary>
+            /// Populates the provided <paramref name="collection"/> with the assemblies generated by this silo.
+            /// </summary>
+            /// <param name="collection">The collection to populate.</param>
+            public void UpdateGeneratedAssemblies(GeneratedAssemblies collection)
+            {
+                var generatedAssemblies = CodeGeneratorManager.GetGeneratedAssemblies();
+                foreach (var asm in generatedAssemblies)
+                {
+                    collection.Add(asm.Key, asm.Value);
+                }
+            }
+
             internal Action<GrainId> Debug_OnDecideToCollectActivation { get; set; }
-            
+
             internal TestHookups(Silo s)
             {
                 silo = s;
@@ -866,24 +900,60 @@ namespace Orleans.Runtime
                 ExecuteFastKillInProcessExit = false;
             }
 
+            // store silos for which we simulate faulty communication
+            // number indicates how many percent of requests are lost
+            internal ConcurrentDictionary<IPEndPoint, double> SimulatedMessageLoss; 
+
+            internal void BlockSiloCommunication(IPEndPoint destination, double lost_percentage)
+            {
+                if (SimulatedMessageLoss == null)
+                    SimulatedMessageLoss = new ConcurrentDictionary<IPEndPoint, double>();
+
+                SimulatedMessageLoss[destination] = lost_percentage;
+            }
+
+            internal void UnblockSiloCommunication()
+            {
+                SimulatedMessageLoss = null;
+            }
+
+            SafeRandom random = new SafeRandom();
+
+            internal bool ShouldDrop(Message msg)
+            {
+                if (SimulatedMessageLoss != null)
+                {
+                    double blockedpercentage = 0.0;
+                    Silo.CurrentSilo.TestHookup.SimulatedMessageLoss.TryGetValue(msg.TargetSilo.Endpoint, out blockedpercentage);
+                    return (random.NextDouble() * 100 < blockedpercentage);
+                }
+                else
+                    return false;
+            }
+
             // this is only for white box testing - use RuntimeClient.Current.SendRequest instead
+
             internal void SendMessageInternal(Message message)
             {
                 silo.messageCenter.SendMessage(message);
             }
 
             // For white-box testing only
+
             internal int UnregisterGrainForTesting(GrainId grain)
             {
                 return silo.catalog.UnregisterGrainForTesting(grain);
             }
 
             // For white-box testing only
+
             internal void SetDirectoryLazyDeregistrationDelay_ForTesting(TimeSpan timeSpan)
             {
                 silo.OrleansConfig.Globals.DirectoryLazyDeregistrationDelay = timeSpan;
             }
+
             // For white-box testing only
+
             internal void SetMaxForwardCount_ForTesting(int val)
             {
                 silo.OrleansConfig.Globals.MaxForwardCount = val;
@@ -899,6 +969,58 @@ namespace Orleans.Runtime
                 }
                 throw new InvalidOperationException(string.Format("Cannot return reference to {0} {1} if it is not MarshalByRefObject or Serializable",
                     what, TypeUtils.GetFullName(obj.GetType())));
+            }
+
+            /// <summary>
+            /// Represents a collection of generated assemblies accross an application domain.
+            /// </summary>
+            public class GeneratedAssemblies : MarshalByRefObject
+            {
+                /// <summary>
+                /// Initializes a new instance of the <see cref="GeneratedAssemblies"/> class.
+                /// </summary>
+                public GeneratedAssemblies()
+                {
+                    this.Assemblies = new Dictionary<string, byte[]>();
+                }
+
+                /// <summary>
+                /// Gets the assemblies which were produced by code generation.
+                /// </summary>
+                public Dictionary<string, byte[]> Assemblies { get; private set; }
+
+                /// <summary>
+                /// Adds a new assembly to this collection.
+                /// </summary>
+                /// <param name="key">
+                /// The full name of the assembly which code was generated for.
+                /// </param>
+                /// <param name="value">
+                /// The raw generated assembly.
+                /// </param>
+                public void Add(string key, byte[] value)
+                {
+                    if (!string.IsNullOrWhiteSpace(key))
+                    {
+                        this.Assemblies[key] = value;
+                    }
+                }
+            }
+
+            /// <summary>
+            /// Methods for optimizing the code generator.
+            /// </summary>
+            public class CodeGeneratorOptimizer : MarshalByRefObject
+            {
+                /// <summary>
+                /// Adds a cached assembly to the code generator.
+                /// </summary>
+                /// <param name="targetAssemblyName">The assembly which the cached assembly was generated for.</param>
+                /// <param name="cachedAssembly">The generated assembly.</param>
+                public void AddCachedAssembly(string targetAssemblyName, byte[] cachedAssembly)
+                {
+                    CodeGeneratorManager.AddGeneratedAssembly(targetAssemblyName, cachedAssembly);
+                }
             }
         }
 

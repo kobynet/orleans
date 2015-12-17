@@ -1,26 +1,3 @@
-﻿/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -29,7 +6,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Xml;
 using Orleans.Providers;
-using Orleans.Runtime.Storage.Relational;
+using System.Reflection;
 
 namespace Orleans.Runtime.Configuration
 {
@@ -104,8 +81,8 @@ namespace Orleans.Runtime.Configuration
 
         public string CustomGatewayProviderAssemblyName { get; set; }
 
-        public Logger.Severity DefaultTraceLevel { get; set; }
-        public IList<Tuple<string, Logger.Severity>> TraceLevelOverrides { get; private set; }
+        public Severity DefaultTraceLevel { get; set; }
+        public IList<Tuple<string, Severity>> TraceLevelOverrides { get; private set; }
         public bool WriteMessagingTraces { get; set; }
         public bool TraceToConsole { get; set; }
         public int LargeMessageWarningThreshold { get; set; }
@@ -201,10 +178,10 @@ namespace Orleans.Runtime.Configuration
             DeploymentId = Environment.UserName;
             DataConnectionString = "";
             // Assume the ado invariant is for sql server storage if not explicitly specified
-            AdoInvariant = AdoNetInvariants.InvariantNameSqlServer;
+            AdoInvariant = Constants.INVARIANT_NAME_SQL_SERVER;
 
-            DefaultTraceLevel = Logger.Severity.Info;
-            TraceLevelOverrides = new List<Tuple<string, Logger.Severity>>();
+            DefaultTraceLevel = Severity.Info;
+            TraceLevelOverrides = new List<Tuple<string, Severity>>();
             TraceToConsole = true;
             TraceFilePattern = "{0}-{1}.log";
             WriteMessagingTraces = false;
@@ -243,7 +220,7 @@ namespace Orleans.Runtime.Configuration
                     switch (child.LocalName)
                     {
                         case "Gateway":
-                            Gateways.Add(ConfigUtilities.ParseIPEndPoint(child));
+                            Gateways.Add(ConfigUtilities.ParseIPEndPoint(child).GetResult());
                             if (GatewayProvider == GatewayProviderType.None)
                             {
                                 GatewayProvider = GatewayProviderType.Config;
@@ -327,6 +304,9 @@ namespace Orleans.Runtime.Configuration
                                     "Invalid integer value for the Port attribute on the LocalAddress element");
                             }
                             break;
+                        case "Telemetry":
+                            ConfigUtilities.ParseTelemetry(child);
+                            break;
                         default:
                             if (child.LocalName.EndsWith("Providers", StringComparison.Ordinal))
                             {
@@ -373,13 +353,13 @@ namespace Orleans.Runtime.Configuration
         /// <param name="properties">Properties that will be passed to stream provider upon initialization</param>
         public void RegisterStreamProvider<T>(string providerName, IDictionary<string, string> properties = null) where T : Orleans.Streams.IStreamProvider
         {
-            Type providerType = typeof(T);
-            if (providerType.IsAbstract ||
-                providerType.IsGenericType ||
-                !typeof(Orleans.Streams.IStreamProvider).IsAssignableFrom(providerType))
+            Type providerTypeInfo = typeof(T).GetTypeInfo();
+            if (providerTypeInfo.IsAbstract ||
+                providerTypeInfo.IsGenericType ||
+                !typeof(Orleans.Streams.IStreamProvider).IsAssignableFrom(providerTypeInfo))
                 throw new ArgumentException("Expected non-generic, non-abstract type which implements IStreamProvider interface", "typeof(T)");
 
-            ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME, providerType.FullName, providerName, properties);
+            ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME, providerTypeInfo.FullName, providerName, properties);
         }
 
         /// <summary>

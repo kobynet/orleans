@@ -1,26 +1,3 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -218,9 +195,9 @@ namespace Orleans.AzureUtils
                 .WaitWithThrow(AzureTableDefaultPolicies.TableOperationTimeout);
         }
 
-        public List<Uri> FindAllGatewayProxyEndpoints()
+        public async Task<IList<Uri>> FindAllGatewayProxyEndpoints()
         {
-            IEnumerable<SiloInstanceTableEntry> gatewaySiloInstances = FindAllGatewaySilos();
+            IEnumerable<SiloInstanceTableEntry> gatewaySiloInstances = await FindAllGatewaySilos();
             return gatewaySiloInstances.Select(ConvertToGatewayUri).ToList();
         }
 
@@ -243,7 +220,7 @@ namespace Orleans.AzureUtils
             return address.ToGatewayUri();
         }
 
-        private IEnumerable<SiloInstanceTableEntry> FindAllGatewaySilos()
+        private async Task<IEnumerable<SiloInstanceTableEntry>> FindAllGatewaySilos()
         {
             if (logger.IsVerbose) logger.Verbose(ErrorCode.Runtime_Error_100277, "Searching for active gateway silos for deployment {0}.", this.DeploymentId);
             const string zeroPort = "0";
@@ -255,9 +232,9 @@ namespace Orleans.AzureUtils
                     && instance.Status == INSTANCE_STATUS_ACTIVE
                     && instance.ProxyPort != zeroPort;
 
-                var queryResults = storage.ReadTableEntriesAndEtagsAsync(query)
-                                    .WaitForResultWithThrow(AzureTableDefaultPolicies.TableOperationTimeout);
-
+                var queryResults = await storage.ReadTableEntriesAndEtagsAsync(query)
+                                    .WithTimeout(AzureTableDefaultPolicies.TableOperationTimeout);
+               
                 List<SiloInstanceTableEntry> gatewaySiloInstances = queryResults.Select(entity => entity.Item1).ToList();
 
                 logger.Info(ErrorCode.Runtime_Error_100278, "Found {0} active Gateway Silos for deployment {1}.", gatewaySiloInstances.Count, this.DeploymentId);
