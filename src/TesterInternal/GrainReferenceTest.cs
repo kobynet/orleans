@@ -1,14 +1,8 @@
-﻿using System;
-using System.IO;
+﻿using System.IO;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Threading.Tasks;
-using System.Web.Script.Serialization;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
-using Orleans.Runtime;
-using Orleans.Serialization;
-using Orleans.Storage;
-using TestInternalGrainInterfaces;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
 
@@ -18,19 +12,8 @@ namespace UnitTests.General
     /// Summary description for GrainReferenceTest
     /// </summary>
     [TestClass]
-    public class GrainReferenceTest : UnitTestSiloHost
+    public class GrainReferenceTest : HostedTestClusterEnsureDefaultStarted
     {
-        [ClassCleanup]
-        public static void MyClassCleanup()
-        {
-            //ResetDefaultRuntimes();
-        }
-
-        [TestCleanup]
-        public void TestCleanup()
-        {
-        }
-
         [TestMethod, TestCategory("Functional"), TestCategory("GrainReference")]
         public void GrainReferenceComparison_DifferentReference()
         {
@@ -60,8 +43,8 @@ namespace UnitTests.General
         [TestMethod, TestCategory("Functional"), TestCategory("GrainReference")]
         public void GrainReference_Pass_this()
         {
-            IChainedGrain g1 = GrainClient.GrainFactory.GetGrain<IChainedGrain>(1);
-            IChainedGrain g2 = GrainClient.GrainFactory.GetGrain<IChainedGrain>(2);
+            IChainedGrain g1 = GrainClient.GrainFactory.GetGrain<IChainedGrain>(GetRandomGrainId());
+            IChainedGrain g2 = GrainClient.GrainFactory.GetGrain<IChainedGrain>(GetRandomGrainId());
             
             g1.PassThis(g2).Wait();
         }
@@ -80,14 +63,14 @@ namespace UnitTests.General
             TestGrainReferenceSerialization(id, false, false);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Serialization"), TestCategory("Json"), TestCategory("GrainReference")]
+        [TestMethod, TestCategory("Functional"), TestCategory("Serialization"), TestCategory("JSON"), TestCategory("GrainReference")]
         public void GrainReference_Json_Serialization()
         {
             int id = random.Next();
             TestGrainReferenceSerialization(id, true, true);
         }
 
-        [TestMethod, TestCategory("Functional"), TestCategory("Serialization"), TestCategory("Json"), TestCategory("GrainReference")]
+        [TestMethod, TestCategory("Functional"), TestCategory("Serialization"), TestCategory("JSON"), TestCategory("GrainReference")]
         public void GrainReference_Json_Serialization_Unresolved()
         {
             int id = random.Next();

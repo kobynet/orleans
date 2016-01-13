@@ -4,7 +4,6 @@ using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 using Orleans.TestingHost;
-using TestInternalGrainInterfaces;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
 
@@ -14,26 +13,20 @@ namespace UnitTests.ConcurrencyTests
     /// Summary description for PersistenceTest
     /// </summary>
     [TestClass]
-    public class ConcurrencyTests : UnitTestSiloHost
+    public class ConcurrencyTests : HostedTestClusterPerFixture
     {
         private static readonly TimeSpan timeout = TimeSpan.FromSeconds(10);
 
-        public ConcurrencyTests()
-            : base(new TestingSiloOptions
-            {
-                StartSecondary = false,
-                AdjustConfig = config=>{
-                    config.Overrides["Primary"].MaxActiveThreads = 2;
-                },
-            })
+        public static TestingSiloHost CreateSiloHost()
         {
-            Console.WriteLine("#### ConcurrencyTests() is called.");
-        }
-
-        [ClassCleanup]
-        public static void MyClassCleanup()
-        {
-            StopAllSilos();
+            return new TestingSiloHost(
+                new TestingSiloOptions
+                {
+                    StartSecondary = false,
+                    AdjustConfig = config => {
+                        config.Overrides["Primary"].MaxActiveThreads = 2;
+                    },
+                });
         }
 
         [TestMethod, TestCategory("Functional"), TestCategory("ReadOnly"), TestCategory("AsynchronyPrimitives")]

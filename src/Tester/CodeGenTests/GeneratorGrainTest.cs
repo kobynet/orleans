@@ -3,32 +3,25 @@ using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 using Orleans.Serialization;
-using TestGrainInterfaces;
+using Orleans.TestingHost;
+using UnitTests.GrainInterfaces;
+using UnitTests.Grains;
 using UnitTests.Tester;
+using System;
+using System.Collections.Generic;
 
 namespace Tester.CodeGenTests
 {
-    using System;
-    using System.Collections.Generic;
-
-    using UnitTests.GrainInterfaces;
-
     /// <summary>
     /// Summary description for GrainClientTest
     /// </summary>
     [TestClass]
-    public class GeneratorGrainTest : UnitTestSiloHost
+    public class GeneratorGrainTest : HostedTestClusterPerFixture
     {
-        [TestInitialize]
-        public void InitializeForTesting()
+        [ClassInitialize]
+        public static void Initialize(TestContext context)
         {
             SerializationManager.InitializeForTesting();
-        }
-
-        [ClassCleanup]
-        public static void MyClassCleanup()
-        {
-            StopAllSilos();
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]
@@ -84,12 +77,19 @@ namespace Tester.CodeGenTests
             const SomeAbstractClass.SomeEnum ExpectedEnum = SomeAbstractClass.SomeEnum.Something;
             var actualEnum = await grain.RoundTripEnum(ExpectedEnum);
             Assert.AreEqual(ExpectedEnum, actualEnum);
+
+            // Test serialization of a generic class which has a value-type constraint.
+            var expectedStructConstraintObject = new ClassWithStructConstraint<int> { Value = 38 };
+            var actualStructConstraintObject =
+                (ClassWithStructConstraint<int>)await grain.RoundTripObject(expectedStructConstraintObject);
+            Assert.AreEqual(expectedStructConstraintObject.Value, actualStructConstraintObject.Value);
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Functional"), TestCategory("GetGrain")]
         public async Task GeneratorGrainControlFlow()
         {
-            IGeneratorTestGrain grain = GrainClient.GrainFactory.GetGrain<IGeneratorTestGrain>(GetRandomGrainId(), "TestGrains.GeneratorTestGrain");
+            var grainName = typeof(GeneratorTestGrain).FullName;
+            IGeneratorTestGrain grain = GrainClient.GrainFactory.GetGrain<IGeneratorTestGrain>(GetRandomGrainId(), grainName);
             
             bool isNull = await grain.StringIsNullOrEmpty();
             Assert.IsTrue(isNull);
@@ -151,7 +151,8 @@ namespace Tester.CodeGenTests
         [TestMethod, TestCategory("Functional"), TestCategory("GetGrain")]
         public async Task GeneratorDerivedGrain2ControlFlow()
         {
-            IGeneratorTestDerivedGrain2 grain = GrainClient.GrainFactory.GetGrain<IGeneratorTestDerivedGrain2>(GetRandomGrainId(), "TestGrains.GeneratorTestDerivedGrain2");
+            var grainName = typeof(GeneratorTestDerivedGrain2).FullName;
+            IGeneratorTestDerivedGrain2 grain = GrainClient.GrainFactory.GetGrain<IGeneratorTestDerivedGrain2>(GetRandomGrainId(), grainName);
 
             bool boolPromise = await grain.StringIsNullOrEmpty();
             Assert.IsTrue(boolPromise);

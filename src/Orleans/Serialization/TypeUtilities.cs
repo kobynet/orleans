@@ -242,9 +242,7 @@ namespace Orleans.Serialization
                 return IsTypeIsInaccessibleForSerialization(typeInfo.GetElementType(), fromModule, fromAssembly);
             }
 
-            var result = typeInfo.IsNestedPrivate || typeInfo.IsNestedFamily || type.IsPointer;
-            
-            return result;
+            return typeInfo.IsNestedPrivate || typeInfo.IsNestedFamily || type.IsPointer;
         }
 
         /// <summary>
@@ -266,12 +264,7 @@ namespace Orleans.Serialization
             // Check InternalsVisibleTo attributes on the from-assembly, pointing to the to-assembly.
             var serializationAssemblyName = toAssembly.GetName().FullName;
             var internalsVisibleTo = fromAssembly.GetCustomAttributes<InternalsVisibleToAttribute>();
-            if (internalsVisibleTo.All(_ => _.AssemblyName != serializationAssemblyName))
-            {
-                return true;
-            }
-
-            return false;
+            return internalsVisibleTo.Any(_ => _.AssemblyName == serializationAssemblyName);
         }
     }
 }
