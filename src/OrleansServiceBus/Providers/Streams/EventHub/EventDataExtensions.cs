@@ -1,9 +1,12 @@
 ﻿
 using Microsoft.ServiceBus.Messaging;
 
-namespace Orleans.ServiceBus.Providers.Streams.EventHub
+namespace Orleans.ServiceBus.Providers
 {
-    internal static class EventDataExtensions
+    /// <summary>
+    /// Extends EventData to support streaming
+    /// </summary>
+    public static class EventDataExtensions
     {
         public const string EventDataPropertyStreamNamespaceKey = "StreamNamespace";
 

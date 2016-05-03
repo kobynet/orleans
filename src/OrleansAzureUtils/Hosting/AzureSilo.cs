@@ -61,6 +61,17 @@ namespace Orleans.Runtime.Host
             logger = TraceLogger.GetLogger("OrleansAzureSilo", TraceLogger.LoggerType.Runtime);
         }
 
+        public static ClusterConfiguration DefaultConfiguration()
+        {
+            var config = new ClusterConfiguration();
+
+            config.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.AzureTable;
+            config.Globals.DeploymentId = AzureClient.GetDeploymentId();
+            config.Globals.DataConnectionString = AzureClient.GetDataConnectionString();
+
+            return config;
+        }
+
         #region Azure RoleEntryPoint methods
 
         /// <summary>
@@ -118,7 +129,7 @@ namespace Orleans.Runtime.Host
                 Port = myEndpoint.Port.ToString(CultureInfo.InvariantCulture),
                 Generation = generation.ToString(CultureInfo.InvariantCulture),
 
-                HostName = host.Config.GetOrAddConfigurationForNode(host.Name).DNSHostName,
+                HostName = host.Config.GetOrCreateNodeConfigurationForSilo(host.Name).DNSHostName,
                 ProxyPort = (proxyEndpoint != null ? proxyEndpoint.Port : 0).ToString(CultureInfo.InvariantCulture),
 
                 RoleName = serviceRuntimeWrapper.RoleName, 

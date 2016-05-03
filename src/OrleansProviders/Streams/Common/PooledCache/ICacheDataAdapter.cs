@@ -1,5 +1,6 @@
 ﻿
 using System;
+using Orleans.Runtime;
 using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.Common
@@ -16,11 +17,30 @@ namespace Orleans.Providers.Streams.Common
         where TQueueMessage : class
         where TCachedMessage : struct
     {
-        void QueueMessageToCachedMessage(ref TCachedMessage cachedMessage, TQueueMessage queueMessage);
+        StreamPosition QueueMessageToCachedMessage(ref TCachedMessage cachedMessage, TQueueMessage queueMessage);
         IBatchContainer GetBatchContainer(ref TCachedMessage cachedMessage);
         StreamSequenceToken GetSequenceToken(ref TCachedMessage cachedMessage);
-        int CompareCachedMessageToSequenceToken(ref TCachedMessage cachedMessage, StreamSequenceToken token);
-        bool IsInStream(ref TCachedMessage cachedMessage, Guid streamGuid, string streamNamespace);
-        bool ShouldPurge(TCachedMessage cachedMessage, IDisposable purgeRequest);
+        StreamPosition GetStreamPosition(TQueueMessage queueMessage);
+        bool ShouldPurge(ref TCachedMessage cachedMessage, IDisposable purgeRequest);
+        Action<IDisposable> PurgeAction { set; }
+    }
+
+    public interface ICacheDataComparer<in TCachedMessage>
+    {
+        int Compare(TCachedMessage cachedMessage, StreamSequenceToken streamToken);
+        int Compare(TCachedMessage cachedMessage, IStreamIdentity streamIdentity);
+    }
+
+    public static class CacheDataComparerExtensions
+    {
+        public static int Compare<TCachedMessage>(this ICacheDataComparer<TCachedMessage> comparer, StreamSequenceToken streamToken, TCachedMessage cachedMessage)
+        {
+            return 0 - comparer.Compare(cachedMessage, streamToken);
+        }
+
+        public static int Compare<TCachedMessage>(this ICacheDataComparer<TCachedMessage> comparer, IStreamIdentity streamIdentity, TCachedMessage cachedMessage)
+        {
+            return 0 - comparer.Compare(cachedMessage, streamIdentity);
+        }
     }
 }
